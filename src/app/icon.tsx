@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 
-export const runtime = 'edge';
+export const dynamic = 'force-static';
 
 export const size = {
   width: 64,
@@ -27,19 +27,19 @@ export default function Icon() {
           style={{
             width: 50,
             height: 50,
-            backgroundColor: '#ce4b2a',
+            backgroundColor: '#ce4b2a', // bg-clay
             borderRadius: '12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             position: 'relative',
-            boxShadow: '0 3px 0 0 #a8371a', 
+            boxShadow: '0 3px 0 0 #a8371a', // shadow-[0_2px_0_0_var(--clay-deep)]
           }}
         >
-          {/* Letra G (Growthive) */}
+          {/* Letra G */}
           <div
             style={{
-              color: '#faf5ea', 
+              color: '#faf5ea', // text-cream-paper
               fontSize: 34,
               fontWeight: 900,
               fontFamily: 'serif',
@@ -64,7 +64,7 @@ export default function Icon() {
               justifyContent: 'center',
             }}
           >
-            {/* Triángulo interior (usamos un SVG porque Satori no soporta los trucos de bordes CSS) */}
+            {/* Triángulo interior */}
             <svg
               width="9"
               height="9"

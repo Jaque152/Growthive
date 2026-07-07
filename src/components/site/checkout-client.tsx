@@ -19,11 +19,10 @@ import { Button } from "@/components/ui/button";
 import { useCart, IVA_RATE } from "@/lib/cart-context";
 import { formatMXN } from "@/lib/products";
 import { useLanguage } from "@/lib/language-context";
-import { processCheckout } from "@/app/actions/checkout"; 
+import { processCheckout, type CheckoutFormState, type CheckoutItem } from "@/app/actions/checkout";
 
-type FormState = Record<string, string>;
-
-const REQUIRED = [
+// Forzamos que los campos requeridos coincidan estrictamente con la interfaz del servidor
+const REQUIRED: (keyof CheckoutFormState)[] = [
   "nombre",
   "apellidos",
   "email",
@@ -35,7 +34,7 @@ const REQUIRED = [
   "card",
   "cardName",
   "exp",
-  "cvc", // Mantenemos cvc en el estado interno para no romper la conexión con el servidor
+  "cvc",
 ];
 
 function Field({
@@ -82,14 +81,14 @@ export function CheckoutClient() {
   const { items, subtotal, iva, total, hydrated, setQty, remove, clear } = useCart();
   const { t, lang } = useLanguage();
   
-  const [form, setForm] = useState<FormState>({ pais: "México" });
-  const [errors, setErrors] = useState<FormState>({});
+  const [form, setForm] = useState<Partial<CheckoutFormState>>({ pais: "México" });
+  const [errors, setErrors] = useState<Partial<Record<keyof CheckoutFormState, string>>>({});
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<{ no: string; total: number } | null>(null);
 
-  const update = (k: string, v: string) => {
+  const update = (k: keyof CheckoutFormState, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
-    if (errors[k]) setErrors((e) => ({ ...e, [k]: "" }));
+    if (errors[k]) setErrors((e) => ({ ...e, [k]: undefined }));
   };
 
   const fmtCard = (v: string) =>
@@ -105,7 +104,7 @@ export function CheckoutClient() {
   };
 
   const validate = () => {
-    const e: FormState = {};
+    const e: Partial<Record<keyof CheckoutFormState, string>> = {};
     for (const k of REQUIRED) if (!form[k]?.trim()) e[k] = t.checkout.requiredErr;
     if (form.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email))
       e.email = t.checkout.invalidEmail;
@@ -114,6 +113,7 @@ export function CheckoutClient() {
       e.card = t.checkout.incompleteNum;
     if (form.exp && !/^\d{2}\/\d{2}$/.test(form.exp)) e.exp = "MM/AA";
     if (form.cvc && !/^\d{3,4}$/.test(form.cvc)) e.cvc = "3–4";
+    
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -133,11 +133,22 @@ export function CheckoutClient() {
     
     setLoading(true);
 
+    // Mapeamos estrictamente los items a la interfaz que espera el servidor (eliminando el uso de `any`)
+    const checkoutItems: CheckoutItem[] = items.map((i) => ({
+      product: {
+        id: i.product.id,
+        priceMXN: i.product.priceMXN,
+        es: { name: i.product.es.name },
+        en: { name: i.product.en.name },
+      },
+      qty: i.qty,
+    }));
+
     const result = await processCheckout({
-      form,
-      items,
+      form: form as CheckoutFormState,
+      items: checkoutItems,
       totals: { subtotal, iva, total },
-      lang,
+      lang: lang as "es" | "en",
     });
 
     setLoading(false);
@@ -352,7 +363,7 @@ export function CheckoutClient() {
                 Pago encriptado y seguro
               </div>
               <img 
-                src="/logo-octano-2.png" 
+                src="/logo-octano.png" 
                 alt="Procesado por Octano Payments" 
                 className="h-[18px] object-contain opacity-80 mix-blend-multiply" 
               />

@@ -4,13 +4,28 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-export async function processContact(payload: any) {
+// 1. DEFINIMOS LOS TIPOS ESTRICTOS
+export interface ContactFormState {
+  nombre: string;
+  correo: string;
+  telefono: string;
+  asunto: string;
+  mensaje: string;
+}
+
+export interface ContactPayload {
+  form: ContactFormState;
+  lang: "es" | "en";
+}
+
+// 2. APLICAMOS EL TIPO AL PAYLOAD
+export async function processContact(payload: ContactPayload) {
   try {
     const { form, lang } = payload;
     const adminEmail = process.env.ADMIN_EMAIL || "hola@growthive.com.mx";
     const senderEmail = "Growthive <hola@growthive.com.mx>";
 
-    const texts: Record<string, any> = {
+    const texts = {
       es: {
         subjectClient: "Hemos recibido tu mensaje - Growthive",
         subjectAdmin: `Nuevo mensaje de contacto: ${form.nombre}`,
@@ -78,8 +93,9 @@ export async function processContact(payload: any) {
     });
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ Error en processContact:", error);
-    return { success: false, error: error.message };
+    const errorMessage = error instanceof Error ? error.message : "Ocurrió un error desconocido";
+    return { success: false, error: errorMessage };
   }
 }

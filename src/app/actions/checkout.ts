@@ -5,13 +5,54 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 const OCTANO_BASE_URL = "https://pagos.octanopayments.com/api/v1";
 
-export async function processCheckout(payload: any) {
+// 1. DEFINIMOS LOS TIPOS ESTRICTOS (Cero 'any')
+export interface CheckoutFormState {
+  nombre: string;
+  apellidos: string;
+  email: string;
+  telefono: string;
+  empresa?: string;
+  rfc?: string;
+  direccion: string;
+  ciudad: string;
+  estado: string;
+  cp: string;
+  pais: string;
+  card: string;
+  cardName: string;
+  exp: string;
+  cvc: string;
+  notas?: string;
+}
+
+export interface CheckoutItem {
+  product: {
+    id: string | number;
+    priceMXN: number;
+    es: { name: string };
+    en: { name: string };
+  };
+  qty: number;
+}
+
+export interface CheckoutPayload {
+  form: CheckoutFormState;
+  items: CheckoutItem[];
+  totals: {
+    subtotal: number;
+    iva: number;
+    total: number;
+  };
+  lang: "es" | "en";
+}
+
+// 2. APLICAMOS EL TIPO AL PAYLOAD
+export async function processCheckout(payload: CheckoutPayload) {
   try {
     const { form, items, totals, lang } = payload;
     const orderId = `PC-${Math.floor(100000 + Math.random() * 899999)}`;
     const currentLang = lang || "es";
 
-    // 1. AUTENTICACIÓN EN OCTANO
     const authRes = await fetch(`${OCTANO_BASE_URL}/signin`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -24,7 +65,6 @@ export async function processCheckout(payload: any) {
     if (!authData.authToken) throw new Error("Error de autenticación con la pasarela.");
     const token = authData.authToken;
 
-    // 2. TOKENIZACIÓN DE LA TARJETA
     const expParts = form.exp.split("/");
     const cardData = {
       cardNumber: form.card.replace(/\s/g, ""),
@@ -44,10 +84,9 @@ export async function processCheckout(payload: any) {
     const tokenData = await tokenRes.json();
     if (!tokenData.cardNumberToken) throw new Error("Error al procesar la tarjeta.");
 
-    // 3. PROCESAR LA VENTA
     const salePayload = {
       amount: Math.round(totals.total * 100) / 100,
-      currency: 484, // MXN
+      currency: 484,
       reference: orderId,
       customerInformation: {
         firstName: form.nombre,
@@ -64,8 +103,9 @@ export async function processCheckout(payload: any) {
         cardNumberToken: tokenData.cardNumberToken,
         cvv: form.cvc,
       },
-      items: items.map((i: any) => ({
-        title: i.product[currentLang].name, // <-- Usa el idioma activo
+      // TypeScript ahora infiere que 'i' es de tipo CheckoutItem automáticamente
+      items: items.map((i) => ({
+        title: i.product[currentLang].name,
         amount: Math.round(i.product.priceMXN * 100) / 100,
         quantity: i.qty,
         id: String(i.product.id),
@@ -83,7 +123,6 @@ export async function processCheckout(payload: any) {
     });
     const saleData = await saleRes.json();
 
-    // 4. MANEJO DE RESPUESTA DE OCTANO
     if (saleData.status === "DECLINED") {
       return { success: false, error: "Pago declinado. Intenta con otra tarjeta." };
     }
@@ -96,22 +135,28 @@ export async function processCheckout(payload: any) {
       return { success: false, error: "Respuesta inesperada del procesador de pago." };
     }
 
-    // 5. ENVÍO DE CORREOS BILINGÜES
     await enviarCorreos(orderId, form, items, totals, currentLang);
 
     return { success: true, orderId };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Checkout Error:", error);
-    return { success: false, error: error.message || "Ocurrió un error al procesar el pago." };
+    const errorMessage = error instanceof Error ? error.message : "Ocurrió un error al procesar el pago.";
+    return { success: false, error: errorMessage };
   }
 }
 
-async function enviarCorreos(orderId: string, form: any, items: any, totals: any, lang: string) {
+// 3. TIPAMOS LOS PARÁMETROS DE LA FUNCIÓN DE CORREOS
+async function enviarCorreos(
+  orderId: string,
+  form: CheckoutFormState,
+  items: CheckoutItem[],
+  totals: { subtotal: number; iva: number; total: number },
+  lang: "es" | "en"
+) {
   const adminEmail = process.env.ADMIN_EMAIL || "hola@growthive.com.mx";
   const senderEmail = "Growthive <hola@growthive.com.mx>"; 
 
-  // Diccionario del correo
-  const texts: Record<string, any> = {
+  const texts = {
     es: {
       subjectClient: `¡Gracias por tu pedido! Folio: ${orderId}`,
       subjectAdmin: `💰 NUEVA VENTA: ${orderId} - ${form.nombre}`,
@@ -142,7 +187,7 @@ async function enviarCorreos(orderId: string, form: any, items: any, totals: any
 
   const t = texts[lang] || texts["es"];
   
-  const itemsListHtml = items.map((i: any) => `
+  const itemsListHtml = items.map((i) => `
     <tr>
       <td style="padding: 10px; border-bottom: 1px solid #eee;">${i.qty}x ${i.product[lang].name}</td>
       <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">$${(i.product.priceMXN * i.qty).toFixed(2)} MXN</td>

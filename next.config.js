@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "export",
   distDir: "out",
   allowedDevOrigins: ["*.preview.same-app.com"],
   images: {

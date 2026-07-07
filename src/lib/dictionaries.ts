@@ -51,9 +51,8 @@ export const dictionaries = {
       ],
       titlePart1: "Grow",
       titlePart2: "thive",
-      servicesBtn: "Ver servicios",
       deliveryText: "Diseño profesional,\nentrega 100% en línea.",
-      ctaBtn: "Iniciar proyecto",
+
     },
     about: {
       eyebrow: "Sobre nosotros",
@@ -302,7 +301,6 @@ export const dictionaries = {
       ],
       titlePart1: "Grow",
       titlePart2: "thive",
-      servicesBtn: "View services",
       deliveryText: "Professional design,\n100% online delivery.",
       ctaBtn: "Start project",
     },

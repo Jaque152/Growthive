@@ -49,9 +49,6 @@ export function ProductCard({
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
         />
-        <span className="absolute left-3 top-3 rounded-full bg-cream-paper/90 px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink backdrop-blur">
-          {product.currency}
-        </span>
       </div>
 
       <div className="flex flex-1 flex-col px-1 pt-5">
@@ -66,6 +63,9 @@ export function ProductCard({
           <div>
             <p className="display text-2xl font-semibold text-clay">
               {formatMXN(product.priceMXN)}
+            </p>
+            <p className="mt-1 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-muted-foreground">
+              {product.currency}
             </p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

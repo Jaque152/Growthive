@@ -436,6 +436,209 @@ export const webPlans: ProductPlan[] = [
       description: 'Up to 8 pages, custom corporate design, initial technical SEO optimization, CRM integration, advanced web security.',
       features: ['Up to 8 pages', 'Custom corporate design', 'Initial technical SEO optimization', 'CRM integration', 'Advanced web security']
     }
+  },
+  {
+    id: 'bolsa-soporte-digital',
+    priceMXN: 2600.00,
+    taxIncluded: false,
+    currency: 'MXN + IVA',
+    imageUrl: 'https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?auto=format&fit=crop&w=800&q=80', 
+    es: {
+      name: 'Bolsa de Soporte Digital Prioritario',
+      description: 'Paquete de asistencia técnica para resolver múltiples solicitudes menores durante un periodo determinado. Ideal para empresas o emprendedores que requieren apoyo frecuente sin contratar un plan mensual.',
+      features: [
+        'Incluye hasta 5 solicitudes de soporte',
+        'Resolución de incidencias básicas',
+        'Asesoría personalizada',
+        'Atención prioritaria en horario laboral',
+        'Seguimiento hasta la conclusión de cada solicitud',
+        'Entregable: bitácora digital con las solicitudes atendidas'
+      ]
+    },
+    en: {
+      name: 'Priority Digital Support Package',
+      description: 'Technical assistance package to resolve multiple minor requests over a specific period. Ideal for companies or entrepreneurs requiring frequent support without a monthly plan.',
+      features: [
+        'Includes up to 5 support requests',
+        'Basic issue resolution',
+        'Personalized advisory',
+        'Priority attention during business hours',
+        'Follow-up until request completion',
+        'Deliverable: digital log of attended requests'
+      ]
+    }
+  },
+  {
+    id: 'soporte-tecnico-remoto',
+    priceMXN: 1890.00,
+    taxIncluded: false,
+    currency: 'MXN + IVA',
+    imageUrl: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80',
+    es: {
+      name: 'Soporte Técnico Remoto Básico',
+      description: 'Atención remota para solucionar incidencias sencillas relacionadas con páginas web, equipos, programas, configuraciones, errores comunes o funcionamiento de servicios digitales.',
+      features: [
+        'Incluye hasta 2 horas de soporte',
+        'Solución de errores comunes y configuraciones',
+        'Entregable: reporte de actividades realizadas',
+        'Confirmación del funcionamiento del servicio atendido'
+      ]
+    },
+    en: {
+      name: 'Basic Remote Technical Support',
+      description: 'Remote assistance to solve simple issues related to websites, equipment, programs, configurations, common errors, or the operation of digital services.',
+      features: [
+        'Includes up to 2 hours of support',
+        'Resolution of common errors and configurations',
+        'Deliverable: report of activities performed',
+        'Confirmation of service operation'
+      ]
+    }
+  },
+  {
+    id: 'configuracion-inicial',
+    priceMXN: 1350.00,
+    taxIncluded: false,
+    currency: 'MXN + IVA',
+    imageUrl: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&q=80',
+    es: {
+      name: 'Configuración Inicial de Herramientas',
+      description: 'Configuración básica de una plataforma o servicio digital, como cuentas de correo empresarial, formularios, perfiles administrativos, accesos o herramientas de productividad.',
+      features: [
+        'Configuración básica de plataforma digital',
+        'Creación de cuentas, formularios o perfiles',
+        'Pruebas de funcionamiento',
+        'Entregable: configuración terminada',
+        'Evidencia digital del servicio realizado'
+      ]
+    },
+    en: {
+      name: 'Initial Tools Setup',
+      description: 'Basic setup of a digital platform or service, such as business email accounts, forms, administrative profiles, access, or productivity tools.',
+      features: [
+        'Basic setup of a digital platform',
+        'Account, form, or profile creation',
+        'Functionality testing',
+        'Deliverable: completed setup',
+        'Digital evidence of the service performed'
+      ]
+    }
+  },
+  {
+    id: 'servicio-express-dudas',
+    priceMXN: 510.00,
+    taxIncluded: false,
+    currency: 'MXN + IVA',
+    imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80',
+    es: {
+      name: 'Servicio Express de Resolución de Dudas',
+      description: 'Sesión personalizada para resolver dudas relacionadas con sitios web, herramientas digitales, administración básica, procesos en línea o plataformas. Incluye orientación práctica.',
+      features: [
+        'Atención por videollamada o medios digitales',
+        'Duración de hasta 30 minutos',
+        'Orientación práctica y recomendaciones aplicables',
+        'Entregable: resumen digital con respuestas y recomendaciones',
+        'Enlaces útiles cuando aplique'
+      ]
+    },
+    en: {
+      name: 'Express Doubt Resolution Service',
+      description: 'Personalized session to resolve doubts related to websites, digital tools, basic administration, online processes, or platforms. Includes practical guidance.',
+      features: [
+        'Attention via video call or digital media',
+        'Duration up to 30 minutes',
+        'Practical guidance and applicable recommendations',
+        'Deliverable: digital summary with answers and recommendations',
+        'Useful links when applicable'
+      ]
+    }
+  },
+  {
+    id: 'diagnostico-problemas',
+    priceMXN: 890.00,
+    taxIncluded: false,
+    currency: 'MXN + IVA',
+    imageUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80',
+    es: {
+      name: 'Diagnóstico de Problemas Digitales',
+      description: 'Revisión de inconvenientes básicos en sitios web, correo electrónico, dominios, formularios, configuraciones sencillas o herramientas digitales. Se identifica la causa del problema.',
+      features: [
+        'Revisión de inconvenientes digitales básicos',
+        'Identificación de la causa del problema',
+        'Corrección durante la sesión (cuando es posible)',
+        'Entregable: reporte de diagnóstico',
+        'Acciones realizadas o recomendaciones para su solución'
+      ]
+    },
+    en: {
+      name: 'Digital Problem Diagnostics',
+      description: 'Review of basic issues in websites, emails, domains, forms, simple configurations, or digital tools. The cause of the problem is identified.',
+      features: [
+        'Review of basic digital issues',
+        'Identification of the problem cause',
+        'Correction during the session (when possible)',
+        'Deliverable: diagnostic report',
+        'Actions taken or recommendations for solution'
+      ]
+    }
+  },
+  {
+    id: 'asesoria-digital-basica',
+    priceMXN: 310.00,
+    taxIncluded: false,
+    currency: 'MXN + IVA',
+    imageUrl: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+    es: {
+      name: 'Asesoría Digital Básica',
+      description: 'Orientación personalizada para resolver dudas o inconvenientes sencillos relacionados con plataformas digitales, administración básica de sitios web, herramientas en línea o procesos tecnológicos.',
+      features: [
+        'Atención mediante videollamada o medios digitales',
+        'Hasta 15 minutos de asesoría',
+        'Resolución de hasta 2 dudas relacionadas',
+        'Recomendaciones prácticas para su aplicación',
+        'Entregable: resumen digital con los puntos tratados'
+      ]
+    },
+    en: {
+      name: 'Basic Digital Consulting',
+      description: 'Personalized guidance to solve simple doubts or issues related to digital platforms, basic website administration, online tools, or technological processes.',
+      features: [
+        'Attention via video call or digital media',
+        'Up to 15 minutes of consulting',
+        'Resolution of up to 2 related doubts',
+        'Practical recommendations for application',
+        'Deliverable: digital summary with discussed points'
+      ]
+    }
+  },
+  {
+    id: 'consulta-digital-rapida',
+    priceMXN: 180.00,
+    taxIncluded: false,
+    currency: 'MXN + IVA',
+    imageUrl: 'https://images.unsplash.com/photo-1512314889357-e157c22f938d?auto=format&fit=crop&w=800&q=80',
+    es: {
+      name: 'Consulta Digital Rápida',
+      description: 'Resolución de una duda puntual relacionada con herramientas digitales, plataformas en línea, sitios web o procesos básicos. Atención mediante chat o correo electrónico.',
+      features: [
+        'Atención mediante chat o correo electrónico',
+        'Resolución de 1 consulta específica',
+        'Recomendación práctica para solucionar el problema',
+        'Envío de respuesta digital en un plazo acordado',
+        'Servicio 100% en línea'
+      ]
+    },
+    en: {
+      name: 'Quick Digital Query',
+      description: 'Resolution of a specific doubt related to digital tools, online platforms, websites, or basic processes. Attention via chat or email.',
+      features: [
+        'Attention via chat or email',
+        'Resolution of 1 specific query',
+        'Practical recommendation to solve the issue',
+        'Digital response sent within agreed timeframe',
+        '100% online service'
+      ]
+    }
   }
 ];
 

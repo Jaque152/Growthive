@@ -363,9 +363,9 @@ export function CheckoutClient() {
                 Pago encriptado y seguro
               </div>
               <img 
-                src="/logo-octano.png" 
+                src="/logo-octano-2.png" 
                 alt="Procesado por Octano Payments" 
-                className="h-[18px] object-contain opacity-80 mix-blend-multiply" 
+                className="h-[30px] object-contain opacity-80 mix-blend-multiply" 
               />
             </div>
 

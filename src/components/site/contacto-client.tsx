@@ -15,7 +15,7 @@ export function ContactoClient() {
     {
       icon: MapPin,
       label: t.contactPage.detailsLabelAddress,
-      value: "Av. Chapultepec 480, Roma Norte, CDMX",
+      value: "Av. Chapultepec No. 480, Piso 9, Col. Roma Norte, C.P. 06700, Alcaldía Cuauhtémoc, CDMX",
       href: "#",
     },
   ];

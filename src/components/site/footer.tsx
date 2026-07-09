@@ -26,12 +26,15 @@ function MastercardBadge() {
 export function Footer() {
   const { t } = useLanguage();
 
+  // Rutas correspondientes al orden de tu diccionario (Privacidad, Devoluciones, Términos)
+  const legalRoutes = ["/privacidad", "/terminos", "/devoluciones"];
+
   return (
     <footer className="ink-panel text-cream-paper">
       <div className="mx-auto max-w-[1400px] container-px">
         {/* big links */}
         <div className="grid grid-cols-1 gap-6 border-b border-cream-paper/10 py-12 sm:grid-cols-3">
-          {t.footer.bigLinks.map((l) => (
+          {t.footer.bigLinks.map((l: { href: string; label: string }) => (
             <Link
               key={l.href}
               href={l.href}
@@ -47,13 +50,13 @@ export function Footer() {
           <div className="space-y-6">
             <Logo variant="cream" />
             <div className="flex flex-col gap-2">
-              {t.footer.legal.map((l) => (
+              {t.footer.legal.map((label: string, index: number) => (
                 <Link
-                  key={l}
-                  href="#"
+                  key={label}
+                  href={legalRoutes[index] || "#"}
                   className="w-fit font-mono text-[0.72rem] uppercase tracking-[0.12em] text-cream-paper/40 transition-colors hover:text-clay"
                 >
-                  {l}
+                  {label}
                 </Link>
               ))}
             </div>

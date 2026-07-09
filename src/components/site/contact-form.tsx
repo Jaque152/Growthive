@@ -63,7 +63,7 @@ export function ContactForm() {
     if (!form.nombre.trim()) e.nombre = t.contact.errName;
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.correo))
       e.correo = t.contact.errEmail;
-    if (!form.mensaje.trim() || form.mensaje.trim().length < 10)
+    if (!form.mensaje.trim() || form.mensaje.trim().length < 5)
       e.mensaje = t.contact.errMsg;
     setErrors(e);
     return Object.keys(e).length === 0;

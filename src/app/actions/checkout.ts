@@ -3,9 +3,54 @@
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const OCTANO_BASE_URL = "https://pagos.octanopayments.com/api/v1";
+const ETOMIN_BASE_URL = "https://pagos.etomin.com/api/v1";
 
-// 1. DEFINIMOS LOS TIPOS ESTRICTOS (Cero 'any')
+// 1. FUNCIÓN DE SEGURIDAD PARA PARSEAR LA API DE ETOMIN
+async function safeEtominFetch(url: string, options: RequestInit) {
+  // Configurar cabeceras obligatorias para evitar bloqueos del WAF de Etomin
+  const headers = new Headers(options.headers || {});
+  if (!headers.has("User-Agent")) {
+    headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
+  }
+  if (!headers.has("Origin")) {
+    headers.set("Origin", "https://growthive.com.mx");
+  }
+
+  const res = await fetch(url, { ...options, headers });
+  const text = await res.text(); 
+
+  if (text.trim().startsWith("<")) {
+    console.error(`❌ Etomin devolvió HTML (Posible bloqueo de Firewall) [HTTP ${res.status}]:`, text.substring(0, 200));
+    throw new Error("El servidor de pagos bloqueó la conexión.");
+  }
+
+  if (!text || text.trim() === "") {
+    console.error(`❌ Etomin devolvió respuesta vacía [HTTP ${res.status}]`);
+    throw new Error("Respuesta vacía o nula del servidor de pagos.");
+  }
+
+  try {
+    // Intento normal
+    return JSON.parse(text);
+  } catch (error) {
+    console.warn("⚠️ JSON de Etomin malformado, intentando reparar...");
+    const lastBrace = text.lastIndexOf('}');
+    if (lastBrace !== -1) {
+      try {
+        return JSON.parse(text.substring(0, lastBrace + 1));
+      } catch (e) {}
+    }
+    
+    try {
+      return JSON.parse(text.trim() + '}');
+    } catch (e) {}
+
+    console.error("❌ Etomin API devolvió un texto imposible de parsear:", text);
+    throw new Error("Error de comunicación con la pasarela de pagos.");
+  }
+}
+
+// 2. DEFINIMOS LOS TIPOS ESTRICTOS
 export interface CheckoutFormState {
   nombre: string;
   apellidos: string;
@@ -46,25 +91,35 @@ export interface CheckoutPayload {
   lang: "es" | "en";
 }
 
-// 2. APLICAMOS EL TIPO AL PAYLOAD
+// 3. PROCESAMIENTO DEL PAGO
 export async function processCheckout(payload: CheckoutPayload) {
   try {
     const { form, items, totals, lang } = payload;
     const orderId = `PC-${Math.floor(100000 + Math.random() * 899999)}`;
     const currentLang = lang || "es";
 
-    const authRes = await fetch(`${OCTANO_BASE_URL}/signin`, {
+    // Aseguramos que las credenciales no sean undefined (evita crasheos en URLSearchParams)
+    const emailStr = process.env.ETOMIN_EMAIL;
+    const passwordStr = process.env.ETOMIN_PASSWORD;
+
+    if (!emailStr || !passwordStr) {
+      throw new Error("Credenciales de la pasarela no configuradas en el servidor.");
+    }
+
+    // A. AUTENTICACIÓN EN ETOMIN
+    const authData = await safeEtominFetch(`${ETOMIN_BASE_URL}/signin`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        email: process.env.OCTANO_EMAIL!,
-        password: process.env.OCTANO_PASSWORD!,
+        email: emailStr,    
+        password: passwordStr,
       }),
     });
-    const authData = await authRes.json();
+
     if (!authData.authToken) throw new Error("Error de autenticación con la pasarela.");
     const token = authData.authToken;
 
+    // B. TOKENIZACIÓN DE LA TARJETA
     const expParts = form.exp.split("/");
     const cardData = {
       cardNumber: form.card.replace(/\s/g, ""),
@@ -73,7 +128,7 @@ export async function processCheckout(payload: CheckoutPayload) {
       expirationYear: `20${expParts[1]}`,
     };
 
-    const tokenRes = await fetch(`${OCTANO_BASE_URL}/card/tokenizer`, {
+    const tokenData = await safeEtominFetch(`${ETOMIN_BASE_URL}/card/tokenizer`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -81,12 +136,13 @@ export async function processCheckout(payload: CheckoutPayload) {
       },
       body: JSON.stringify({ cardData }),
     });
-    const tokenData = await tokenRes.json();
+
     if (!tokenData.cardNumberToken) throw new Error("Error al procesar la tarjeta.");
 
+    // C. PROCESAR LA VENTA
     const salePayload = {
       amount: Math.round(totals.total * 100) / 100,
-      currency: 484,
+      currency: 484, // MXN
       reference: orderId,
       customerInformation: {
         firstName: form.nombre,
@@ -103,7 +159,6 @@ export async function processCheckout(payload: CheckoutPayload) {
         cardNumberToken: tokenData.cardNumberToken,
         cvv: form.cvc,
       },
-      // TypeScript ahora infiere que 'i' es de tipo CheckoutItem automáticamente
       items: items.map((i) => ({
         title: i.product[currentLang].name,
         amount: Math.round(i.product.priceMXN * 100) / 100,
@@ -113,7 +168,7 @@ export async function processCheckout(payload: CheckoutPayload) {
       redirectUrl: "https://growthive.com.mx/checkout",
     };
 
-    const saleRes = await fetch(`${OCTANO_BASE_URL}/sale`, {
+    const saleData = await safeEtominFetch(`${ETOMIN_BASE_URL}/sale`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -121,10 +176,10 @@ export async function processCheckout(payload: CheckoutPayload) {
       },
       body: JSON.stringify(salePayload),
     });
-    const saleData = await saleRes.json();
 
+    // D. EVALUAR RESPUESTA
     if (saleData.status === "DECLINED") {
-      return { success: false, error: "Pago declinado. Intenta con otra tarjeta." };
+      return { success: false, error: "Pago declinado. Revisa los fondos o intenta con otra tarjeta." };
     }
     
     if (saleData.status === "PENDING" && saleData.redirectTo) {
@@ -132,9 +187,10 @@ export async function processCheckout(payload: CheckoutPayload) {
     }
 
     if (saleData.status !== "APPROVED") {
-      return { success: false, error: "Respuesta inesperada del procesador de pago." };
+      return { success: false, error: "La transacción falló o fue rechazada por el banco." };
     }
 
+    // E. ENVÍO DE CORREOS
     await enviarCorreos(orderId, form, items, totals, currentLang);
 
     return { success: true, orderId };
@@ -145,7 +201,6 @@ export async function processCheckout(payload: CheckoutPayload) {
   }
 }
 
-// 3. TIPAMOS LOS PARÁMETROS DE LA FUNCIÓN DE CORREOS
 async function enviarCorreos(
   orderId: string,
   form: CheckoutFormState,
@@ -162,7 +217,7 @@ async function enviarCorreos(
       subjectAdmin: `💰 NUEVA VENTA: ${orderId} - ${form.nombre}`,
       title: `Confirmación de Pedido: ${orderId}`,
       hello: `Hola`,
-      intro: `Tu pago ha sido procesado exitosamente mediante Octano Payments. Hemos recibido tu solicitud para iniciar tu proyecto digital.`,
+      intro: `Tu pago ha sido procesado exitosamente. Hemos recibido tu solicitud para iniciar tu proyecto digital.`,
       totalPaid: `Total Pagado:`,
       clientData: `Datos del Cliente`,
       emailLabel: `Email:`,
@@ -175,7 +230,7 @@ async function enviarCorreos(
       subjectAdmin: `💰 NEW SALE: ${orderId} - ${form.nombre}`,
       title: `Order Confirmation: ${orderId}`,
       hello: `Hello`,
-      intro: `Your payment has been successfully processed via Octano Payments. We have received your request to start your digital project.`,
+      intro: `Your payment has been successfully processed. We have received your request to start your digital project.`,
       totalPaid: `Total Paid:`,
       clientData: `Customer Information`,
       emailLabel: `Email:`,
@@ -232,6 +287,6 @@ async function enviarCorreos(
       html: `<div style="background-color: #f4ede0; padding: 20px;">${emailBody}</div>`,
     });
   } catch (err) {
-    console.error("❌ Error ejecutando Resend (Checkout):", err);
+    console.error("❌ Error ejecutando Resend:", err);
   }
 }

@@ -18,7 +18,7 @@ export interface OctanoCardData {
   number: string;
   name: string;
   month: string; // "05" o "5" → se normaliza
-  year: string;  // "25" o "2025" → se normaliza a "25"
+  year: string; // "25" o "2025" → se normaliza a "25"
 }
 
 export interface TokenizedCard {
@@ -59,7 +59,27 @@ export interface OctanoSaleResult {
   status: string;
   transactionId: string | null;
   message: string;
-  raw?: unknown;
+  raw?: OctanoApiResponse;
+}
+
+/**
+ * Respuesta genérica de la API de Octano.
+ * No conocemos todos sus campos, así que usamos index signature.
+ */
+interface OctanoApiResponse {
+  authToken?: string;
+  cardNumberToken?: string;
+  token?: string;
+  status?: string;
+  redirectTo?: string;
+  orderId?: string;
+  reference?: string;
+  transactionId?: string;
+  id?: string;
+  message?: string;
+  error?: string;
+  raw?: string;
+  [key: string]: unknown;
 }
 
 // -----------------------------------------------------------------------------
@@ -68,6 +88,18 @@ export interface OctanoSaleResult {
 
 let authToken: string | null = null;
 let tokenExpiry: number | null = null;
+
+/**
+ * Parsea una respuesta como JSON. Si falla, la envuelve en { raw }.
+ * Evita `any` tipando el retorno como OctanoApiResponse.
+ */
+function parseJsonSafe(text: string): OctanoApiResponse {
+  try {
+    return JSON.parse(text) as OctanoApiResponse;
+  } catch {
+    return { raw: text };
+  }
+}
 
 /**
  * Autentica contra Octano. Cachea el token por 15 minutos.
@@ -107,12 +139,7 @@ export async function octanoLogin(): Promise<string> {
   });
 
   const responseText = await response.text();
-  let data: any;
-  try {
-    data = JSON.parse(responseText);
-  } catch {
-    data = { raw: responseText };
-  }
+  const data = parseJsonSafe(responseText);
 
   if (!response.ok) {
     const errMessage =
@@ -138,11 +165,11 @@ export async function octanoLogin(): Promise<string> {
  *   - Mes  → "5"  a "05"
  *   - Año  → "2025" a "25"  |  "25" se queda "25"
  */
-function normalizeExpiration(monthInput: string, yearInput: string): {
-  month: string;
-  year: string;
-} {
-  let month = String(monthInput).replace(/\D/g, "").padStart(2, "0");
+function normalizeExpiration(
+  monthInput: string,
+  yearInput: string,
+): { month: string; year: string } {
+  const month = String(monthInput).replace(/\D/g, "").padStart(2, "0");
   let year = String(yearInput).replace(/\D/g, "");
 
   if (year.length === 4) {
@@ -200,12 +227,7 @@ export async function tokenizarTarjeta(
   });
 
   const responseText = await response.text();
-  let data: any;
-  try {
-    data = JSON.parse(responseText);
-  } catch {
-    data = { raw: responseText };
-  }
+  const data = parseJsonSafe(responseText);
 
   if (!response.ok) {
     const errMessage =
@@ -287,12 +309,7 @@ export async function procesarPago(
   });
 
   const responseText = await response.text();
-  let data: any;
-  try {
-    data = JSON.parse(responseText);
-  } catch {
-    data = { raw: responseText };
-  }
+  const data = parseJsonSafe(responseText);
 
   console.log("📥 [Octano] Respuesta /sale:", data);
 

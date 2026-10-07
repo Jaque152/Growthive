@@ -1,56 +1,20 @@
+// src/app/actions/checkout.ts
 "use server";
 
 import { Resend } from "resend";
+import {
+  octanoLogin,
+  tokenizarTarjeta,
+  procesarPago,
+  parseExpiration,
+} from "@/lib/octano";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-// URL base actualizada para Octano
-const OCTANO_BASE_URL = "https://pagos.octanopayments.com/api/v1";
 
-// 1. FUNCIÓN DE SEGURIDAD PARA PARSEAR LA API DE OCTANO
-async function safeOctanoFetch(url: string, options: RequestInit) {
-  // Configurar cabeceras obligatorias para evitar bloqueos del WAF
-  const headers = new Headers(options.headers || {});
-  if (!headers.has("User-Agent")) {
-    headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
-  }
-  if (!headers.has("Origin")) {
-    headers.set("Origin", "https://growthive.com.mx");
-  }
+// -----------------------------------------------------------------------------
+// Tipos públicos (usados por checkout-client.tsx)
+// -----------------------------------------------------------------------------
 
-  const res = await fetch(url, { ...options, headers });
-  const text = await res.text(); 
-
-  if (text.trim().startsWith("<")) {
-    console.error(`❌ Octano devolvió HTML (Posible bloqueo de Firewall) [HTTP ${res.status}]:`, text.substring(0, 200));
-    throw new Error("El servidor de pagos bloqueó la conexión.");
-  }
-
-  if (!text || text.trim() === "") {
-    console.error(`❌ Octano devolvió respuesta vacía [HTTP ${res.status}]`);
-    throw new Error("Respuesta vacía o nula del servidor de pagos.");
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    console.warn("⚠️ JSON de Octano malformado, intentando reparar...");
-    const lastBrace = text.lastIndexOf('}');
-    if (lastBrace !== -1) {
-      try {
-        return JSON.parse(text.substring(0, lastBrace + 1));
-      } catch (e) {}
-    }
-    
-    try {
-      return JSON.parse(text.trim() + '}');
-    } catch (e) {}
-
-    console.error("❌ Octano API devolvió un texto imposible de parsear:", text);
-    throw new Error("Error de comunicación con la pasarela de pagos.");
-  }
-}
-
-// 2. DEFINIMOS LOS TIPOS ESTRICTOS
 export interface CheckoutFormState {
   nombre: string;
   apellidos: string;
@@ -91,125 +55,132 @@ export interface CheckoutPayload {
   lang: "es" | "en";
 }
 
-// 3. PROCESAMIENTO DEL PAGO
-export async function processCheckout(payload: CheckoutPayload) {
+export interface CheckoutResult {
+  success: boolean;
+  orderId?: string;
+  redirectTo?: string;
+  error?: string;
+}
+
+// -----------------------------------------------------------------------------
+// Server Action principal
+// -----------------------------------------------------------------------------
+
+export async function processCheckout(
+  payload: CheckoutPayload,
+): Promise<CheckoutResult> {
   try {
     const { form, items, totals, lang } = payload;
-    const orderId = `PC-${Math.floor(100000 + Math.random() * 899999)}`;
     const currentLang = lang || "es";
+    const orderId = `GV-${Date.now().toString(36).toUpperCase()}`;
 
-    const emailStr = process.env.OCTANO_EMAIL;
-    const passwordStr = process.env.OCTANO_PASSWORD;
+    // -------------------------------------------------------------------------
+    // 1. Autenticación en Octano
+    // -------------------------------------------------------------------------
+    const sessionToken = await octanoLogin();
 
-    if (!emailStr || !passwordStr) {
-      throw new Error("Credenciales de la pasarela no configuradas en el servidor.");
-    }
+    // -------------------------------------------------------------------------
+    // 2. Tokenización de la tarjeta
+    // -------------------------------------------------------------------------
+    const { month, year } = parseExpiration(form.exp); // "MM/AA" → { "05", "25" }
 
-    // A. AUTENTICACIÓN EN OCTANO
-    // Octano requiere estrictamente application/x-www-form-urlencoded
-    const authData = await safeOctanoFetch(`${OCTANO_BASE_URL}/signin`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        email: emailStr,    
-        password: passwordStr,
-      }),
+    const { token: cardToken, last4 } = await tokenizarTarjeta(sessionToken, {
+      number: form.card.replace(/\s/g, ""),
+      name: form.cardName,
+      month,
+      year, // 👈 2 dígitos
     });
 
-    if (!authData.authToken) throw new Error("Error de autenticación con la pasarela.");
-    const token = authData.authToken;
+    console.log("💳 [Checkout] Tarjeta tokenizada. Últimos 4:", last4);
 
-    // B. TOKENIZACIÓN DE LA TARJETA
-    const expParts = form.exp.split("/");
-    const cardData = {
-      cardNumber: form.card.replace(/\s/g, ""),
-      cardholderName: form.cardName,
-      expirationMonth: expParts[0].trim(),
-      expirationYear: `20${expParts[1].trim()}`,
-    };
-
-    const tokenData = await safeOctanoFetch(`${OCTANO_BASE_URL}/card/tokenizer`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ cardData }),
-    });
-
-    if (!tokenData.cardNumberToken) throw new Error("Error al procesar la tarjeta.");
-
-    // C. PROCESAR LA VENTA
-    const salePayload = {
-      amount: Math.round(totals.total * 100) / 100,
-      currency: 484, // MXN (Requerido por Octano)
-      reference: orderId,
-      customerInformation: {
+    // -------------------------------------------------------------------------
+    // 3. Procesar el cobro
+    // -------------------------------------------------------------------------
+    const resultado = await procesarPago(sessionToken, {
+      amount: totals.total,
+      orderId,
+      customer: {
         firstName: form.nombre,
         lastName: form.apellidos,
         email: form.email,
-        phone1: form.telefono,
-        city: form.ciudad,
+        phone: form.telefono,
         address1: form.direccion,
-        postalCode: form.cp,
+        city: form.ciudad,
         state: form.estado,
+        postalCode: form.cp,
         country: form.pais === "México" ? "Mx" : form.pais,
+        company: form.empresa || "",
       },
-      cardData: {
-        cardNumberToken: tokenData.cardNumberToken,
-        cvv: form.cvc.replace(/\s/g, ""), // Limpiamos espacios por seguridad
-      },
-      items: items.map((i) => ({
-        title: i.product[currentLang].name,
-        amount: Math.round(i.product.priceMXN * 100) / 100,
-        quantity: i.qty,
-        id: String(i.product.id),
-      })),
-      redirectUrl: "https://growthive.com.mx/checkout",
-    };
-
-    const saleData = await safeOctanoFetch(`${OCTANO_BASE_URL}/sale`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(salePayload),
+      cardToken,
+      cvv: form.cvc.replace(/\s/g, ""),
     });
 
-    // D. EVALUAR RESPUESTA
-    if (saleData.status === "DECLINED") {
-      return { success: false, error: "Pago declinado. Revisa los fondos o intenta con otra tarjeta." };
-    }
-    
-    if (saleData.status === "PENDING" && saleData.redirectTo) {
-      return { success: true, redirectTo: saleData.redirectTo };
+    console.log("💰 [Checkout] Resultado Octano:", resultado.status);
+
+    // -------------------------------------------------------------------------
+    // 4. Si Octano requiere 3DS redirect
+    // -------------------------------------------------------------------------
+    if (resultado.needsRedirect && resultado.redirectUrl) {
+      return {
+        success: true,
+        redirectTo: resultado.redirectUrl,
+      };
     }
 
-    if (saleData.status !== "APPROVED") {
-      return { success: false, error: "La transacción falló o fue rechazada por el banco." };
+    // -------------------------------------------------------------------------
+    // 5. Si fue declinado / rechazado
+    // -------------------------------------------------------------------------
+    if (!resultado.success) {
+      const msg =
+        resultado.status === "DECLINED"
+          ? currentLang === "es"
+            ? "Pago declinado. Revisa los fondos o intenta con otra tarjeta."
+            : "Payment declined. Check funds or try another card."
+          : currentLang === "es"
+            ? "La transacción falló o fue rechazada por el banco."
+            : "The transaction failed or was rejected by the bank.";
+
+      return { success: false, error: msg };
     }
 
-    // E. ENVÍO DE CORREOS
-    await enviarCorreos(orderId, form, items, totals, currentLang);
+    // -------------------------------------------------------------------------
+    // 6. Enviar correos (cliente + admin)
+    // -------------------------------------------------------------------------
+    await enviarCorreos(
+      resultado.orderId || orderId,
+      last4,
+      form,
+      items,
+      totals,
+      currentLang,
+    );
 
-    return { success: true, orderId };
+    return { success: true, orderId: resultado.orderId || orderId };
   } catch (error: unknown) {
-    console.error("Checkout Error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Ocurrió un error al procesar el pago.";
+    console.error("❌ [Checkout] Error:", error);
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Ocurrió un error al procesar el pago.";
     return { success: false, error: errorMessage };
   }
 }
 
+// -----------------------------------------------------------------------------
+// Emails con Resend (copy ES/EN manteniendo branding Growthive)
+// -----------------------------------------------------------------------------
+
 async function enviarCorreos(
   orderId: string,
+  last4: string,
   form: CheckoutFormState,
   items: CheckoutItem[],
   totals: { subtotal: number; iva: number; total: number },
-  lang: "es" | "en"
+  lang: "es" | "en",
 ) {
   const adminEmail = process.env.ADMIN_EMAIL || "hola@growthive.com.mx";
-  const senderEmail = "Growthive <hola@growthive.com.mx>"; 
+  const senderEmail =
+    process.env.EMAIL_FROM || "Growthive <hola@growthive.com.mx>";
 
   const texts = {
     es: {
@@ -218,12 +189,14 @@ async function enviarCorreos(
       title: `Confirmación de Pedido: ${orderId}`,
       hello: `Hola`,
       intro: `Tu pago ha sido procesado exitosamente. Hemos recibido tu solicitud para iniciar tu proyecto digital.`,
+      orderSummary: "Resumen del pedido",
+      cardLabel: "Tarjeta",
       totalPaid: `Total Pagado:`,
       clientData: `Datos del Cliente`,
       emailLabel: `Email:`,
       phoneLabel: `Teléfono:`,
       companyLabel: `Empresa/RFC:`,
-      footer: `Growthive — Estudio Digital CDMX.`
+      footer: `Growthive — Estudio Digital CDMX.`,
     },
     en: {
       subjectClient: `Thank you for your order! Folio: ${orderId}`,
@@ -231,31 +204,40 @@ async function enviarCorreos(
       title: `Order Confirmation: ${orderId}`,
       hello: `Hello`,
       intro: `Your payment has been successfully processed. We have received your request to start your digital project.`,
+      orderSummary: "Order Summary",
+      cardLabel: "Card",
       totalPaid: `Total Paid:`,
       clientData: `Customer Information`,
       emailLabel: `Email:`,
       phoneLabel: `Phone:`,
       companyLabel: `Company/Tax ID:`,
-      footer: `Growthive — Digital Studio CDMX.`
-    }
+      footer: `Growthive — Digital Studio CDMX.`,
+    },
   };
 
-  const t = texts[lang] || texts["es"];
-  
-  const itemsListHtml = items.map((i) => `
+  const t = texts[lang] || texts.es;
+
+  const itemsListHtml = items
+    .map(
+      (i) => `
     <tr>
       <td style="padding: 10px; border-bottom: 1px solid #eee;">${i.qty}x ${i.product[lang].name}</td>
       <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">$${(i.product.priceMXN * i.qty).toFixed(2)} MXN</td>
     </tr>
-  `).join("");
+  `,
+    )
+    .join("");
 
   const emailBody = `
-    <div style="font-family: Arial, sans-serif; max-w: 600px; margin: 0 auto; color: #333;">
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
       <h2 style="color: #ce4b2a;">${t.title}</h2>
       <p>${t.hello} <strong>${form.nombre}</strong>,</p>
       <p>${t.intro}</p>
-      
-      <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+
+      <p style="margin: 8px 0;"><strong>${t.cardLabel}:</strong> **** **** **** ${last4}</p>
+
+      <h3 style="margin-top: 24px;">${t.orderSummary}</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
         ${itemsListHtml}
         <tr>
           <td style="padding: 10px; font-weight: bold; text-align: right;">${t.totalPaid}</td>
@@ -286,7 +268,9 @@ async function enviarCorreos(
       subject: t.subjectAdmin,
       html: `<div style="background-color: #f4ede0; padding: 20px;">${emailBody}</div>`,
     });
+
+    console.log("📧 [Checkout] Correos enviados.");
   } catch (err) {
-    console.error("❌ Error ejecutando Resend:", err);
+    console.error("❌ [Checkout] Error enviando Resend:", err);
   }
 }
